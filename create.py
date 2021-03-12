@@ -1,8 +1,10 @@
 import os
+import re
 import cv2
 import fitz
 import numpy
 import shutil
+import easygui
 import webbrowser
 from PIL import Image
 from PyPDF2 import PdfFileReader
@@ -19,13 +21,11 @@ if not os.path.exists(os.path.join(path, "temp")):
 
 #Input templates and images
 
-quality = 3
-
 template = os.path.join(path, "template.pdf")
 
-print("Mode 1: Input screenshots\nMode 2: Input PDF")
-mode = 0
-while mode != 1 and mode != 2:
+print("Mode 0: Input folder with screenshots\nMode 1: Input screenshots\nMode 2: Input PDF\nMode 3: Select File")
+mode = -1
+while mode != 0 and mode != 1 and mode != 2 and mode != 3:
     mode = int(input("Mode: "))
 
 
@@ -34,23 +34,41 @@ while mode != 1 and mode != 2:
 #Input
 files = []
 
-if mode == 1: 
-    thickness = 1
+if mode == 0:
+
+    quality = 1
+    thickness = quality
+    folder = input("Input folder: ")
+    files = [folder + "/" + i for i in os.listdir(folder) if i.endswith(".png")]
+    files.sort(key=lambda f: int(re.sub('\D', '', f)))
+    if files == []:
+        exit()
+
+elif mode == 1:
+    quality = 1
+    thickness = quality
     count = 1
     while True:
         infile = input("Input Image {}: ".format(count))
         if infile == "":
             break
         else:
-            files.append(f)
+            files.append(infile)
         count += 1
 
     if files == []:
         exit()
 
-elif mode == 2:
+elif mode == 2 or mode == 3:
+    quality = 3
     thickness = quality
-    pdffile = input("Input PDF: ")
+    if mode == 2:
+        pdffile = input("Input PDF: ")
+    else:
+        pdffile = None
+        while pdffile == None:
+            pdffile = easygui.fileopenbox(msg="Choose File", default='/Users/TanKeeMeng/Downloads/Harrow/Textbooks/Math Textbooks', filetypes=".pdf", multiple=False)
+    begin = int(input("Input number of introduction pages: "))
     file = fitz.open(pdffile)
 
     with open(pdffile, "rb") as pdf:
@@ -85,14 +103,14 @@ elif mode == 2:
     single = []
     
     if p == "0":
-        [single.append(i) for i in range(1, end + 1)]
+        [single.append(i) for i in range(1+begin, end+1)]
     else:
         for item in p.replace(" ","").split(','):
             ranges = item.split('-')
             if len(ranges) == 1:
-                single.append(int(ranges[0]))
+                single.append(int(ranges[0])+begin)
             else:
-                [single.append(i) for i in range(int(ranges[0]), int(ranges[-1]) + 1)]
+                [single.append(i+begin) for i in range(int(ranges[0]), int(ranges[-1]) + 1)]
 
     count = 0
     for num in single:
@@ -107,7 +125,7 @@ elif mode == 2:
 
 scale = float(input("Input size of images (~0.4): "))
 
-
+erode_amount = 8 * quality
 
 
 #Cheatsheet
@@ -120,6 +138,9 @@ print("""
 │ Press v to add vertical line     │
 │ Press b to show vertical lines   │
 │ Press n to not include a region  │
+│ Press a to use AI to split lines │
+│ Press w to change erode value +1 │
+│ Press s to change erode value -1 │
 │ Press spacebar to split at lines │
 └──────────────────────────────────┘""")
 
@@ -140,7 +161,7 @@ for file in files:
     x_value = 0
     y_value = 0
 
-    def click_and_crop(event, x, y, flags, param):
+    def click(event, x, y, flags, param):
         global lines
         global x_value
         global y_value
@@ -160,7 +181,7 @@ for file in files:
     name = "Image " + str(counter + 1) + " of " + str(len(files)) + " (" + str(int(percentage)) + "%)"
     cv2.namedWindow(name, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(name, (int(1000 * ratio), 1000))
-    cv2.setMouseCallback(name, click_and_crop)
+    cv2.setMouseCallback(name, click)
 
 
 
@@ -250,6 +271,62 @@ for file in files:
         elif key == ord("n"):
             remove.append(y_value)
 
+        elif key == 27:
+            exit()
+            
+        elif key == ord("w"):
+            erode_amount += 1
+            print(f"Erode value: {erode_amount}")
+
+        elif key == ord("s"):
+            erode_amount -= 1
+            print(f"Erode value: {erode_amount}")
+        
+        elif key == ord("a"):
+
+            img = cv2.imread(file)
+            grayImage = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+            (thresh, blackwhite) = cv2.threshold(grayImage, 200, 255, cv2.THRESH_BINARY)
+
+            kernel = numpy.ones((erode_amount, erode_amount), numpy.uint8)
+            eroded = cv2.erode(blackwhite, kernel, iterations=1)
+
+            cv2.imwrite(os.path.join(path, "temp", "erode.png"), eroded)
+
+
+            img = Image.open(os.path.join(path, "temp", "erode.png"))
+            w, h = img.size
+
+            array = []
+            for ypixel in range(h):
+                black = False
+                for xpixel in range(w):
+                    if img.getpixel((xpixel,ypixel)) == 0:
+                        black = True
+                        break
+                if not black:
+                    array.append(ypixel)
+
+
+            count = 1
+            temp = []
+            ranges = []
+            while count <= len(array):
+                if count == len(array) or array[count-1] + 1 != array[count]:
+                    temp.append(array[count-1])
+                    ranges.append(temp)
+                    temp = []
+                else:
+                    temp.append(array[count-1])
+                count += 1
+
+
+            for i in ranges:
+                lines.append(int(sum(i) / len(i)))
+
+
+
 
     cv2.destroyAllWindows()
 
@@ -286,7 +363,9 @@ for file in files:
 
 #shrink images
     count = 0
-    while count < total:
+    count2 = 0
+    total1 = total
+    while count < total1:
         #+ total - len(lines)
         image = cv2.imread(os.path.join(path, "temp", str(count)) + ".png")
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -314,8 +393,12 @@ for file in files:
 
         top, bottom, left, right = [int(img.shape[1] * 0.01)] * 4
         shrink = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=[255, 255, 255])
-        
-        cv2.imwrite(os.path.join(path, "temp", str(count)) + ".png", shrink)
+
+        if shrink.shape[0] > 4 and shrink.shape[1] > 4:
+            cv2.imwrite(os.path.join(path, "temp", str(count2)) + ".png", shrink)
+            count2 += 1
+        else:
+            total -= 1
         count += 1
 
     counter += 1
