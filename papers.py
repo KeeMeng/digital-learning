@@ -16,14 +16,14 @@ count = 0
 total = 0
 pages = []
 for root, dirs, files in os.walk(path):
-    for file in files:
-        if file != ".DS_Store" and file.endswith(".pdf"):
-            with open(os.path.join(root, file), "rb") as pdf:
-                reader = PdfFileReader(pdf, strict=False)
+	for file in files:
+		if file != ".DS_Store" and file.endswith(".pdf"):
+			with open(os.path.join(root, file), "rb") as pdf:
+				reader = PdfFileReader(pdf, strict=False)
 
-                count += 1
-                total += reader.numPages
-                pages.append(reader.numPages)
+				count += 1
+				total += reader.numPages
+				pages.append(reader.numPages)
 
 
 pages.sort()
@@ -50,9 +50,9 @@ plt.xlim(0, array[-1]+1)
 plt.grid(axis='y', alpha=0.7)
 outliers = len(pages) - len(array)
 if outliers != 0:
-    plt.title("Pages in PDF (Excluding {} outliers)".format(str(outliers)), size = 15, pad = 10)
+	plt.title("Pages in PDF (Excluding {} outliers)".format(str(outliers)), size = 15, pad = 10)
 else:
-    plt.title("Pages in PDF", size = 15, pad = 10)
+	plt.title("Pages in PDF", size = 15, pad = 10)
 
 
 print("Statistics: ")
