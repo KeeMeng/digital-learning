@@ -7,9 +7,10 @@ import matplotlib.pyplot as plt
 from PyPDF2 import PdfFileReader
 
 
-path = "/Users/TanKeeMeng/Downloads/GoodNotes"
-#path = "/Users/TanKeeMeng/Downloads/Harrow/Textbooks"
-#path = input("Path: ")
+path = input("Path: ").strip()
+
+while not os.path.exists(path):
+	path = input("Path: ").strip()
 
 #count pages
 count = 0
@@ -39,10 +40,9 @@ minimum = int(pages[0])
 maximum = int(pages[-1])
 stdev = numpy.std(array)
 distance = abs(array - mean)
-not_outlier = distance < 1.5 * stdev
+not_outlier = distance < 2 * stdev
 array = array[not_outlier]
 
-##plt.hist(array, bins="auto", edgecolor="black", linewidth=1, color="#4DBD33")
 plt.hist(array, bins=numpy.arange(array[-1]+array[-1]-array[-2])-0.5, edgecolor="black", linewidth=1, color="#4DBD33")
 plt.xlabel("Pages")
 plt.xticks(numpy.arange(0, array[-1]+2, step=1))
@@ -56,6 +56,7 @@ else:
 
 
 print("Statistics: ")
+print("Files: {}".format(count+1))
 print("Mean: {}".format(mean))
 print("Mode: {}".format(mode))
 print("Median: {}".format(median))
