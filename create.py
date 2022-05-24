@@ -4,38 +4,46 @@ import cv2
 import fitz
 import numpy
 import shutil
-import easygui
 import webbrowser
 from PIL import Image
+from tkinter import filedialog
 from PyPDF2 import PdfFileReader
 
 
+def click(event, x, y, flags, param):
+	global lines, x_value, y_value
+
+	if event == cv2.EVENT_MOUSEMOVE:
+		y_value = y
+	elif event == cv2.EVENT_LBUTTONDOWN:
+		lines.append(y)
+		y_value = 0
+	x_value = x
 
 
-#Temp folder
+# Temp folder
 path = os.getcwd()
 if not os.path.exists(os.path.join(path, "temp")):
 	os.makedirs(os.path.join(path, "temp"))
 
 
 
-#Input templates and images
-
+# Input templates and images
 template = os.path.join(path, "template.pdf")
-
-print("Mode 0: Input folder with screenshots\nMode 1: Input screenshots\nMode 2: Input PDF\nMode 3: Select File")
-mode = -1
-while mode != 0 and mode != 1 and mode != 2 and mode != 3:
-	mode = int(input("Mode: "))
-
-
-
-
-#Input
+textbook_dir = "/Users/keemeng/Library/Mobile Documents/com~apple~CloudDocs/School/Harrow/Textbooks/"
 files = []
 
-if mode == 0:
 
+# Input modes
+print("""
+Mode 0: Input folder with screenshots
+Mode 1: Input screenshots
+Mode 2: Input PDF
+Mode 3: Select File
+Or type in textbook acroynm""")
+
+mode = input("Mode: ")
+if mode == "0":
 	quality = 1
 	thickness = quality
 	folder = input("Input folder: ")
@@ -44,30 +52,49 @@ if mode == 0:
 	if files == []:
 		exit()
 
-elif mode == 1:
+elif mode == "1":
 	quality = 1
 	thickness = quality
 	count = 1
 	while True:
-		infile = input("Input Image {}: ".format(count))
-		if infile == "":
+		screenshot = input(f"Input Image {count}: ")
+		if screenshot == "":
 			break
 		else:
-			files.append(infile)
+			files.append(screenshot)
 		count += 1
 
 	if files == []:
 		exit()
 
-elif mode == 2 or mode == 3:
+else:
 	quality = 3
 	thickness = quality
-	if mode == 2:
+	if mode == "2":
 		pdffile = input("Input PDF: ")
+
+	elif mode == "3":
+		pdffile = ""
+		while pdffile == "":
+			pdffile = filedialog.askopenfilename(initialdir=textbook_dir)
+
 	else:
-		pdffile = None
-		while pdffile == None:
-			pdffile = easygui.fileopenbox(msg="Choose File", default='/Users/TanKeeMeng/Downloads/Harrow/Textbooks/Math Textbooks', filetypes=".pdf", multiple=False)
+		textbooks = {
+			"p1":  "Math Textbooks/Pure Mathematics Year 1.pdf", 
+			"p2":  "Math Textbooks/Pure Mathematics Year 2.pdf", 
+			"sm1": "Math Textbooks/Statistics and Mechanics Year 1.pdf", 
+			"sm2": "Math Textbooks/Statistics and Mechanics Year 2.pdf", 
+			"cp1": "Further Maths Textbooks/Core Pure Mathematics 1.pdf", 
+			"cp2": "Further Maths Textbooks/Core Pure Mathematics 2.pdf", 
+			"fm1": "Math Textbooks/Further Mechanics 1", 
+			"fm2": "Math Textbooks/Further Mechanics 2", 
+			"fs1": "Math Textbooks/Further Statistics 1", 
+			"fs2": "Math Textbooks/Further Statistics 2"}
+
+		pdffile = textbook_dir + textbooks.get(mode)
+		if not pdffile:
+			exit()
+
 	begin = int(input("Input number of introduction pages: "))
 	file = fitz.open(pdffile)
 
@@ -75,60 +102,42 @@ elif mode == 2 or mode == 3:
 		reader = PdfFileReader(pdf, strict=False)
 		end = reader.numPages
 
-	print("There are {} pages. \nInput 0 for all pages. ".format(end))
+	print(f"There are {end} pages, Input 0 for all pages. ")
 
-	mat = fitz.Matrix(quality, quality)
 
 	if not os.path.exists(os.path.join(path, "temp", "input")):
 		os.makedirs(os.path.join(path, "temp", "input"))
 
 
-	# start = int(input("Page to start: ")) - 1
-	# if start == -1:
-	#	start = 0
-	# else:
-	#	end = int(input("Page to end: ")) - 1
-		
-	
-	# while start <= end:
-	#	page = file.loadPage(start)
-	#	pixels = page.getPixmap(matrix = mat)
-	#	output = os.path.join(path, "temp", "input", str(start)) + ".png"
-	#	pixels.writePNG(output)
-	#	files.append(output)
-	#	start += 1
-
-
+	individual_pages = []
 	p = input("Pages: ")
-	single = []
 	
 	if p == "0":
-		[single.append(i) for i in range(1+begin, end+1)]
+		individual_pages = [i for i in range(1+begin, end+1)]
 	else:
-		for item in p.replace(" ","").split(','):
+		for item in p.replace(" ", "").split(','):
 			ranges = item.split('-')
 			if len(ranges) == 1:
-				single.append(int(ranges[0])+begin)
+				individual_pages.append(int(ranges[0])+begin)
 			else:
-				[single.append(i+begin) for i in range(int(ranges[0]), int(ranges[-1]) + 1)]
+				[individual_pages.append(i+begin) for i in range(int(ranges[0]), int(ranges[-1]) + 1)]
 
 	count = 0
-	for num in single:
-		page = file.loadPage(num-1)
-		pixels = page.getPixmap(matrix = mat)
-		output = os.path.join(path, "temp", "input", str(count)) + ".png"
-		pixels.writePNG(output)
+	quality_matrix = fitz.Matrix(quality, quality)
+	for num in individual_pages:
+		page = file.load_page(num-1)
+		pixels = page.get_pixmap(matrix=quality_matrix)
+		output = os.path.join(path, "temp", "input", f"{count}.png")
+		# output = os.path.join(path, "temp", "input", str(count)) + ".png"
+		pixels.save(output)
 		files.append(output)
 		count += 1
 
-
-
 scale = float(input("Input size of images (~0.4): "))
-
 erode_amount = 8 * quality
 
 
-#Cheatsheet
+# Cheatsheet
 print("""
 ┌──────────────────────────────────┐
 │ Click to add a line              │
@@ -147,203 +156,190 @@ print("""
 
 
 
-#loop
+# loop
 total = 0
 counter = 0
 skip = False
 
+print("[", end="")
+
 for file in files:
 
-#horizontal lines
-	up = 1
+	# horizontal lines
+	crosshair = 1
 	lines = []
 	remove = []
-	x_value = 0
-	y_value = 0
-
-	def click(event, x, y, flags, param):
-		global lines
-		global x_value
-		global y_value
-
-		if event == cv2.EVENT_MOUSEMOVE:
-			y_value = y
-		elif event == cv2.EVENT_LBUTTONUP:
-			lines.append(y)
-			y_value = 0
-		x_value = x
-
+	
 	image = cv2.imread(file)
 	width = image.shape[1]
 	height = image.shape[0]
 	ratio = width / height
 	percentage = (counter) / len(files) * 100
-	name = "Image " + str(counter + 1) + " of " + str(len(files)) + " (" + str(int(percentage)) + "%)"
-	cv2.namedWindow(name, cv2.WINDOW_NORMAL)
-	cv2.resizeWindow(name, (int(1000 * ratio), 1000))
-	cv2.setMouseCallback(name, click)
+
+	if mode != "0":
+		x_value = 0
+		y_value = 0
+
+		name = f"Image {counter + 1} of {len(files)} ({int(percentage)}%)"
+		cv2.namedWindow(name, cv2.WINDOW_NORMAL)
+		cv2.resizeWindow(name, (int(1000*ratio), 1000))
+		cv2.setMouseCallback(name, click)
 
 
+		# show image
+		while True:
+			image = cv2.imread(file)
+
+			for i in lines:
+				cv2.line(image, (0, i), (width, i), (0, 0, 0), thickness * 2)
+
+			copy = lines[:]
+			copy.append(height)
+			copy.sort()
+			temp_bottom = 0
+
+			for i in copy:
+				bottom = temp_bottom
+				top = i
+
+				null = False
+				for r in remove:
+					if r > bottom and r < top:
+						null = not null
+
+				if null:
+					cv2.rectangle(image, (0 + thickness, bottom + thickness), (width - thickness, top - thickness), (0, 0, 255), thickness)
+
+				temp_bottom = i
 
 
-#show image
-	while True:
-		image = cv2.imread(file)
+			if y_value != 0:
+				if crosshair == 1:
+					cv2.line(image, (0, y_value), (width, y_value), (150, 150, 150), thickness)
 
+				elif crosshair == 2:
+					cv2.line(image, (x_value, 0), (x_value, height), (150, 150, 150), thickness)
 
-		for i in lines:
-			cv2.line(image, (0, i), (width, i), (0, 0, 0), thickness * 2)
+				elif crosshair == 3:
+					cv2.line(image, (0, y_value), (width, y_value), (150, 150, 150), thickness)
+					cv2.line(image, (x_value, 0), (x_value, height), (150, 150, 150), thickness)
 
-
-		copy = lines[:]
-
-		copy.append(height)
-		copy.sort()
-		old = 0
-		for i in copy:
-			bottom = old
-			height = i
-
-			null = False
-			for r in remove:
-				if r > bottom and r < height:
-					null = not null
-
-			if null:
-				cv2.rectangle(image, (0 + thickness, bottom + thickness), (width - thickness, height - thickness), (0, 0, 255), thickness)
-
-			old = i
-
-
-		if y_value != 0:
-			if up == 1:
-				cv2.line(image, (0, y_value), (width, y_value), (150, 150, 150), thickness)
-
-			elif up == 2:
-				cv2.line(image, (x_value, 0), (x_value, height), (150, 150, 150), thickness)
-
-			elif up == 3:
-				cv2.line(image, (0, y_value), (width, y_value), (150, 150, 150), thickness)
-				cv2.line(image, (x_value, 0), (x_value, height), (150, 150, 150), thickness)
-
-		cv2.imshow(name, image)
-		
-		key = cv2.waitKey(1) & 0xFF
-		if key == ord(" "):
-			break
-
-		elif key == ord("z"):
-			if lines != []:
-				lines.pop()
-
-		elif key == ord("x"):
-			if lines != []:
-				diff = lambda value: abs(value - y_value)
-				lines.remove(min(lines, key=diff))
-
-		elif key == ord("c"):
-			lines = []
-
-		elif key == ord("v"):
-
-			image = Image.open(file, mode="r")
-
-			left = image.crop((0, 0, x_value, height))
-			right = image.crop((x_value, 0, width, height))
-			right.save(file.replace(".png", "r.png"))
-			left.save(file.replace(".png", "l.png"))
-
-			files.insert(counter + 1, file.replace(".png", "r.png"))
-			files.insert(counter + 1, file.replace(".png", "l.png"))
-
-			#files.remove(file)
-
-			cv2.destroyAllWindows()
-			counter += 1
-			skip = True
-			break
-
-		elif key == ord("b"):
-			up += 1
-			if up == 4:
-				up = 1
-
-		elif key == ord("n"):
-			remove.append(y_value)
-
-		elif key == 27:
-			exit()
+			cv2.imshow(name, image)
 			
-		elif key == ord("w"):
-			erode_amount += 1
-			print(f"Erode value: {erode_amount}")
+			key = cv2.waitKey(100) & 0xFF
+			if key == ord(" "):
+				break
 
-		elif key == ord("s"):
-			erode_amount -= 1
-			print(f"Erode value: {erode_amount}")
-		
-		elif key == ord("a"):
+			elif key == ord("z"):
+				if lines != []:
+					lines.pop()
 
-			img = cv2.imread(file)
-			grayImage = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+			elif key == ord("x"):
+				if lines != []:
+					lines.remove(min(lines, key=lambda value: abs(value - y_value)))
 
-			(thresh, blackwhite) = cv2.threshold(grayImage, 200, 255, cv2.THRESH_BINARY)
+			elif key == ord("c"):
+				lines = []
 
-			kernel = numpy.ones((erode_amount, erode_amount), numpy.uint8)
-			eroded = cv2.erode(blackwhite, kernel, iterations=1)
+			elif key == ord("v"):
 
-			cv2.imwrite(os.path.join(path, "temp", "erode.png"), eroded)
+				crop_image = Image.open(file, mode="r")
 
+				left = crop_image.crop((0, 0, x_value, height))
+				right = crop_image.crop((x_value, 0, width, height))
+				right.save(file.replace(".png", "r.png"))
+				left.save(file.replace(".png", "l.png"))
 
-			img = Image.open(os.path.join(path, "temp", "erode.png"))
-			w, h = img.size
-
-			array = []
-			for ypixel in range(h):
-				black = False
-				for xpixel in range(w):
-					if img.getpixel((xpixel,ypixel)) == 0:
-						black = True
-						break
-				if not black:
-					array.append(ypixel)
+				files.insert(counter + 1, file.replace(".png", "r.png"))
+				files.insert(counter + 1, file.replace(".png", "l.png"))
 
 
-			count = 1
-			temp = []
-			ranges = []
-			while count <= len(array):
-				if count == len(array) or array[count-1] + 1 != array[count]:
-					temp.append(array[count-1])
-					ranges.append(temp)
-					temp = []
-				else:
-					temp.append(array[count-1])
-				count += 1
+				cv2.destroyAllWindows()
+				counter += 1
+				skip = True
+				break
+
+			elif key == ord("b"):
+				crosshair += 1
+				if crosshair == 4:
+					crosshair = 1
+
+			elif key == ord("n"):
+				remove.append(y_value)
+
+			elif key == 27:
+				exit()
+				
+			elif key == ord("w"):
+				erode_amount += 1
+				print(f"Erode value: {erode_amount}")
+
+			elif key == ord("s"):
+				erode_amount -= 1
+				print(f"Erode value: {erode_amount}")
+			
+			elif key == ord("a"):
+
+				img = cv2.imread(file)
+				grayImage = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+				(thresh, blackwhite) = cv2.threshold(grayImage, 200, 255, cv2.THRESH_BINARY)
+
+				kernel = numpy.ones((erode_amount, erode_amount), numpy.uint8)
+				eroded = cv2.erode(blackwhite, kernel, iterations=1)
+
+				cv2.imwrite(os.path.join(path, "temp", "erode.png"), eroded)
 
 
-			for i in ranges:
-				lines.append(int(sum(i) / len(i)))
+				img = Image.open(os.path.join(path, "temp", "erode.png"))
+				w, h = img.size
+
+				array = []
+				for ypixel in range(h):
+					black = False
+					for xpixel in range(w):
+						if img.getpixel((xpixel, ypixel)) == 0:
+							black = True
+							break
+					if not black:
+						array.append(ypixel)
+
+
+				count = 1
+				temp = []
+				ranges = []
+				while count <= len(array):
+					if count == len(array) or array[count-1] + 1 != array[count]:
+						temp.append(array[count-1])
+						ranges.append(temp)
+						temp = []
+					else:
+						temp.append(array[count-1])
+					count += 1
+
+
+				for i in ranges:
+					lines.append(int(sum(i) / len(i)))
 
 
 
 
-	cv2.destroyAllWindows()
+		cv2.destroyAllWindows()
 
-	if skip:
-		skip = False
-		continue
-
-
+		if skip:
+			skip = False
+			continue
 
 
-#split at lines
+
+
+	# split at lines
 	lines.append(height)
 	lines.sort()
-	old = 0
+	temp_bottom = 0
 	for i in lines:
 		image = Image.open(file, mode="r")
-		bottom = old
+		bottom = temp_bottom
 		height = i
 
 		null = False
@@ -353,21 +349,20 @@ for file in files:
 
 		if not null:
 			cropped = image.crop((0, bottom, width, height))
-			cropped.save(os.path.join(path, "temp", str(total)) + ".png")
+			cropped.save(os.path.join(path, "temp", f"{total}.png"))
 			total += 1
 
-		old = i
+		temp_bottom = i
 
 
 
 
-#shrink images
+	# shrink images
 	count = 0
 	count2 = 0
 	total1 = total
 	while count < total1:
-		#+ total - len(lines)
-		image = cv2.imread(os.path.join(path, "temp", str(count)) + ".png")
+		image = cv2.imread(os.path.join(path, "temp", f"{count}.png"))
 		gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 		gray = 255 * (gray < 250).astype(numpy.uint8)
 		coordinates = cv2.findNonZero(gray)
@@ -389,13 +384,12 @@ for file in files:
 
 
 		img = image[y:y+h, x:x+w]
-		#cv2.imwrite(os.path.join(path, "temp", str(count + total - len(lines))) + "X.png", img)
 
-		top, bottom, left, right = [int(img.shape[1] * 0.01)] * 4
-		shrink = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=[255, 255, 255])
+		border_width = int(img.shape[1] * 0.01)
+		shrink = cv2.copyMakeBorder(img, border_width, border_width, border_width, border_width, cv2.BORDER_CONSTANT, value=[255, 255, 255])
 
 		if shrink.shape[0] > 4 and shrink.shape[1] > 4:
-			cv2.imwrite(os.path.join(path, "temp", str(count2)) + ".png", shrink)
+			cv2.imwrite(os.path.join(path, "temp", f"{count2}.png"), shrink)
 			count2 += 1
 		else:
 			total -= 1
@@ -403,73 +397,68 @@ for file in files:
 
 	counter += 1
 
+	print(">", end="")
+print("]")
 
 
-#duplicate template
+# duplicate template
 print("[", end="")
 doc = fitz.open(template)
 doc2 = fitz.open(template)
 print(">", end="")
 for i in range(1, total):
-	doc.insertPDF(doc2)
+	doc.insert_pdf(doc2)
 	print(">", end="")
-doc.save(os.path.join(path, "temp.pdf"))
+doc.save(os.path.join(path, "base.pdf"))
 print("]")
 
 
 
 
 while True:
-
-	#overlay
-	count = 0
-	doc = fitz.open(os.path.join(path, "temp.pdf"))
+	# overlay
+	doc = fitz.open(os.path.join(path, "base.pdf"))
 	print("[", end="")
-	for page in doc:
-		image = cv2.imread(os.path.join(path, "temp", str(count)) + ".png")
+	for (page_number, page) in enumerate(doc):
+		image = cv2.imread(os.path.join(path, "temp", f"{page_number}.png"))
 
 		w = image.shape[1] * scale
 		h = image.shape[0] * scale
 		if h > 842:
 			percent = h / 842
 			h = 842
-			w = int(w/percent)
+			w = int(w / percent)
 		if w > 595:
 			percent = w / 595
 			w = 595
-			h = int(h/percent)
+			h = int(h / percent)
 		rect = fitz.Rect(0, 0, w, h)
-		page.insertImage(rect, filename = os.path.join(path, "temp", str(count)) + ".png")
+		page.insert_image(rect, filename = os.path.join(path, "temp", f"{page_number}.png"))
 		
 		print(">", end="")
-		count += 1
 
 	doc.save(os.path.join(path, "output.pdf"))
 	print("]")
 	print("")
 
 
-	webbrowser.open("file:///"+os.path.join(path, "output.pdf"))
+	webbrowser.open("file:///" + os.path.join(path, "output.pdf"))
 
 
 	finish = input("Is the scale of the image ok? (Y/N): ")
 	if finish.lower().startswith("y"):
 		break
 	elif finish == "0":
-		cv2.destroyAllWindows()
-		shutil.rmtree(os.path.join(path, "temp"))
 		shutil.rmtree(os.path.join(path, "output.pdf"))
-		os.remove(os.path.join(path, "temp.pdf"))
-		exit()
+		break
 	else:
 		scale = float(input("Input size of images: "))
 
 
 
 
-#clean up
+# clean up
 cv2.destroyAllWindows()
 shutil.rmtree(os.path.join(path, "temp"))
-os.remove(os.path.join(path, "temp.pdf"))
+os.remove(os.path.join(path, "base.pdf"))
 print("Saved as: " + os.path.join(path, "output.pdf"))
-#print("output.pdf is " + str(round(os.path.getsize(os.path.join(path, "output.pdf"))/1000000,2)) + "mb")
