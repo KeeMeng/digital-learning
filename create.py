@@ -11,13 +11,15 @@ from PyPDF2 import PdfFileReader
 
 
 def click(event, x, y, flags, param):
-	global lines, x_value, y_value
+	global lines, x_value, y_value, edited
 
 	if event == cv2.EVENT_MOUSEMOVE:
 		y_value = y
 	elif event == cv2.EVENT_LBUTTONDOWN:
-		lines.append(y)
-		y_value = 0
+		edited = True
+		if y not in lines:
+			lines.append(y)
+		# y_value = 0
 	x_value = x
 
 
@@ -170,15 +172,16 @@ for file in files:
 	lines = []
 	remove = []
 	
-	image = cv2.imread(file)
-	width = image.shape[1]
-	height = image.shape[0]
+	image_og = cv2.imread(file)
+	width = image_og.shape[1]
+	height = image_og.shape[0]
 	ratio = width / height
 	percentage = (counter) / len(files) * 100
 
 	if mode != "0":
 		x_value = 0
 		y_value = 0
+		edited = True
 
 		name = f"Image {counter + 1} of {len(files)} ({int(percentage)}%)"
 		cv2.namedWindow(name, cv2.WINDOW_NORMAL)
@@ -188,29 +191,37 @@ for file in files:
 
 		# show image
 		while True:
-			image = cv2.imread(file)
 
-			for i in lines:
-				cv2.line(image, (0, i), (width, i), (0, 0, 0), thickness * 2)
+			if edited:
+				edited = False
+				image_base = image_og.copy()
 
-			copy = lines[:]
-			copy.append(height)
-			copy.sort()
-			temp_bottom = 0
+				for i in lines:
+					cv2.line(image_base, (0, i), (width, i), (0, 0, 0), thickness * 2)
 
-			for i in copy:
-				bottom = temp_bottom
-				top = i
+				copy = lines[:]
+				copy.append(height)
+				copy.sort()
+				temp_bottom = 0
 
-				null = False
-				for r in remove:
-					if r > bottom and r < top:
-						null = not null
+				for i in copy:
+					bottom = temp_bottom
+					top = i
 
-				if null:
-					cv2.rectangle(image, (0 + thickness, bottom + thickness), (width - thickness, top - thickness), (0, 0, 255), thickness)
+					null = False
+					for r in remove:
+						if r > bottom and r < top:
+							null = not null
 
-				temp_bottom = i
+					if null:
+						cv2.rectangle(image_base, (0 + thickness, bottom + thickness), (width - thickness, top - thickness), (0, 0, 255), thickness)
+
+					temp_bottom = i
+
+				image = image_base.copy()
+
+			else:
+				image = image_base.copy()
 
 
 			if y_value != 0:
@@ -226,20 +237,23 @@ for file in files:
 
 			cv2.imshow(name, image)
 			
-			key = cv2.waitKey(100) & 0xFF
+			key = cv2.waitKey(10) & 0xFF
 			if key == ord(" "):
 				break
 
 			elif key == ord("z"):
 				if lines != []:
 					lines.pop()
+				edited = True
 
 			elif key == ord("x"):
 				if lines != []:
 					lines.remove(min(lines, key=lambda value: abs(value - y_value)))
+				edited = True
 
 			elif key == ord("c"):
 				lines = []
+				edited = True
 
 			elif key == ord("v"):
 
@@ -266,6 +280,7 @@ for file in files:
 
 			elif key == ord("n"):
 				remove.append(y_value)
+				edited = True
 
 			elif key == 27:
 				exit()
@@ -320,6 +335,8 @@ for file in files:
 
 				for i in ranges:
 					lines.append(int(sum(i) / len(i)))
+
+				edited = True
 
 
 
