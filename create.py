@@ -32,7 +32,7 @@ if not os.path.exists(os.path.join(path, "temp")):
 
 # Input templates and images
 template = os.path.join(path, "template.pdf")
-textbook_dir = "/Users/keemeng/Library/Mobile Documents/com~apple~CloudDocs/School/Harrow/Textbooks/"
+textbook_dir = "Textbooks/"
 files = []
 
 
@@ -237,7 +237,7 @@ for file in files:
 
 			cv2.imshow(name, image)
 			
-			key = cv2.waitKey(10) & 0xFF
+			key = cv2.waitKey(1) & 0xFF
 			if key == ord(" "):
 				break
 
